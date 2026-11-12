@@ -1,0 +1,100 @@
+{% extends 'accounts/base.html' %}
+{% block title %}Escrow #{{ escrow.id }} | DealSure{% endblock %}
+{% block content %}
+<div class="bg-white shadow-lg rounded-lg p-8 max-w-3xl mx-auto">
+  <h1 class="font-bold text-xl text-blue-900 mb-2">Escrow Transaction #{{ escrow.id }}</h1>
+  <div class="text-sm mb-4">Order: <a href="{% url 'procurement:order_detail' escrow.order.id %}" class="text-blue-700 hover:underline">#{{ escrow.order.id }}</a></div>
+  <div class="mb-3 grid grid-cols-2 gap-4">
+    <div>
+      <span class="font-semibold text-gray-700">Buyer:</span> <span class="text-blue-900">{{ escrow.buyer.email }}</span>
+    </div>
+    <div>
+      <span class="font-semibold text-gray-700">Supplier:</span> <span class="text-green-900">{{ escrow.supplier.email }}</span>
+    </div>
+    <div>
+      <span class="font-semibold text-gray-700">Amount:</span> {{ escrow.amount }} {{ escrow.currency }}
+    </div>
+    <div>
+      <span class="font-semibold text-gray-700">Status:</span> <span class="font-bold">{{ escrow.get_status_display }}</span>
+    </div>
+    <div class="col-span-2">
+      <span class="font-semibold text-gray-700">Created:</span> {{ escrow.created_at|date:'Y-m-d H:i' }} &nbsp; <span class='font-semibold'>Updated:</span> {{ escrow.updated_at|date:'Y-m-d H:i' }}
+    </div>
+  </div>
+  <div class="my-6">
+    <h2 class="font-bold text-blue-800 mb-2">Actions</h2>
+    <div class="flex flex-wrap gap-3">
+      {% if request.user == escrow.buyer and escrow.status == 'pending' %}
+        <form method="post" action="{% url 'escrow:transaction_fund' escrow.id %}">
+          {% csrf_token %}
+          <button class="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold">Fund Escrow (Testnet Demo)</button>
+        </form>
+      {% endif %}
+      {% if request.user == escrow.supplier and escrow.status == 'funded' %}
+        <form method="post" action="{% url 'escrow:confirm_delivery' escrow.id %}">
+          {% csrf_token %}
+          <button class="bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded font-semibold">Confirm Delivery</button>
+        </form>
+      {% endif %}
+      {% if request.user == escrow.buyer and escrow.supplier_confirmed_delivery and escrow.status == 'awaiting_delivery' %}
+        <form method="post" action="{% url 'escrow:confirm_receipt' escrow.id %}">
+          {% csrf_token %}
+          <button class="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold">Confirm Receipt</button>
+        </form>
+      {% endif %}
+      {% if (request.user == escrow.buyer or request.user.is_staff) and escrow.status == 'receipt_confirmed' and not escrow.is_disputed %}
+        <form method="post" action="{% url 'escrow:escrow_release' escrow.id %}">
+          {% csrf_token %}
+          <button class="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded font-semibold">Release Funds to Supplier</button>
+        </form>
+      {% endif %}
+      {% if (request.user == escrow.supplier or request.user.is_staff) and escrow.status in 'funded awaiting_delivery'.split() and not escrow.is_disputed %}
+        <form method="post" action="{% url 'escrow:escrow_refund' escrow.id %}">
+          {% csrf_token %}
+          <button class="bg-red-700 hover:bg-red-800 text-white px-4 py-2 rounded font-semibold">Refund to Buyer</button>
+        </form>
+      {% endif %}
+      {% if not escrow.is_disputed and escrow.status != 'released' and escrow.status != 'refunded' %}
+        <a href="{% url 'escrow:dispute_create' escrow.id %}" class="bg-red-100 hover:bg-red-200 text-red-800 font-bold px-4 py-2 rounded">Raise Dispute</a>
+      {% endif %}
+    </div>
+  </div>
+  <div class="my-8">
+    <h2 class="font-bold text-blue-900 mb-2">Dispute Status</h2>
+    {% if escrow.is_disputed %}
+      <div class="text-red-700 font-semibold text-lg">This escrow is currently under dispute.</div>
+      {% for dispute in disputes %}
+        <div class="my-2 p-3 bg-red-50 border border-red-200 rounded">
+          <a href="{% url 'escrow:dispute_detail' dispute.id %}" class="underline">Dispute #{{ dispute.id }}</a> &ndash; Raised by {{ dispute.raised_by.email }} on {{ dispute.created_at|date:'Y-m-d H:i' }}<br>
+          <div class="text-gray-700">{{ dispute.reason|truncatechars:100 }}</div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="text-green-700">No active disputes.</div>
+    {% endif %}
+  </div>
+  <div class="my-8">
+    <h2 class="font-bold text-blue-900 mb-2">Audits & History <span class="text-xs">(recent)</span></h2>
+    <div class="max-h-56 overflow-scroll border bg-gray-50 rounded">
+      <table class="text-xs w-full">
+        <thead><tr><th class="p-1">Time</th><th class="p-1">Actor</th><th class="p-1">Action</th><th class="p-1">Details</th></tr></thead>
+        <tbody>
+        {% for audit in audits %}
+          <tr class="border-b">
+            <td class="p-1">{{ audit.created_at|date:'Y-m-d H:i' }}</td>
+            <td class="p-1">{{ audit.actor.email|default:'System' }}</td>
+            <td class="p-1 font-semibold">{{ audit.action }}</td>
+            <td class="p-1">{{ audit.details|truncatechars:60 }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4" class="text-gray-400 text-center py-3">No audit history.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="mt-8 text-center text-xs text-gray-400">
+    All operations here are demonstration-only and do not interact with mainnet assets. Actual Stellar smart contract escrow is not implemented in the current demo.
+  </div>
+</div>
+{% endblock %}

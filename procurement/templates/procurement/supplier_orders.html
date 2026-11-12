@@ -1,0 +1,41 @@
+{% extends 'accounts/base.html' %}
+{% block title %}Supplier Orders | DealSure{% endblock %}
+{% block content %}
+<div class="mb-5 flex items-center justify-between">
+  <h1 class="font-bold text-xl text-green-900">My Supplier Orders</h1>
+</div>
+<div class="bg-white shadow rounded p-4">
+  <table class="min-w-full text-sm">
+    <thead><tr class="text-green-800 bg-gray-100">
+      <th class="p-2">Order #</th>
+      <th class="p-2">Title</th>
+      <th class="p-2">Buyer</th>
+      <th class="p-2">Amount</th>
+      <th class="p-2">Status</th>
+      <th class="p-2"></th>
+    </tr></thead>
+    <tbody>
+      {% for order in orders %}
+      <tr class="border-b hover:bg-green-50">
+        <td class="p-2">{{ order.id }}</td>
+        <td class="p-2">{{ order.title }}</td>
+        <td class="p-2">{{ order.buyer.business_profile.business_name|default:order.buyer.email }}</td>
+        <td class="p-2">{{ order.amount }} {{ order.currency }}</td>
+        <td class="p-2">{{ order.get_status_display }}</td>
+        <td class="p-2 text-right">
+          <a href="{% url 'procurement:order_detail' order.id %}" class="text-green-700 hover:underline">View</a>
+          {% if not order.invoice and order.status == 'supplier_accepted' %}
+            <a href="{% url 'procurement:supplier_invoice_submit' order.id %}" class="ml-2 text-blue-700 hover:underline">Submit Invoice</a>
+          {% endif %}
+          {% if not order.supplier_decision and order.status == 'invited' %}
+            <a href="{% url 'procurement:supplier_order_decision' order.id %}" class="ml-2 text-blue-700 hover:underline">Accept/Reject</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" class="text-center py-5 text-gray-400">No supplier orders found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

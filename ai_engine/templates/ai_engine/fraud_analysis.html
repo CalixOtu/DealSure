@@ -1,0 +1,59 @@
+{% extends 'accounts/base.html' %}
+{% block title %}Fraud Risk Analysis | Invoice #{{ invoice.invoice_number }} | DealSure{% endblock %}
+{% block content %}
+<div class="bg-white shadow rounded-lg max-w-3xl mx-auto p-8">
+  <h1 class="text-xl font-bold text-blue-800 mb-6">Invoice Fraud Risk Analysis</h1>
+  <div class="text-md text-gray-800 mb-3"><span class="font-semibold">Invoice Number:</span> {{ invoice.invoice_number }}<span class="ml-6 font-semibold">Order:</span> <a href="{% url 'procurement:order_detail' invoice.order.id %}" class="text-blue-700 hover:underline">#{{ invoice.order.id }}</a></div>
+  <div class="mb-8">
+    <table class="text-sm w-full">
+      <tr><td class="font-semibold py-1">Supplier</td><td class="py-1">{{ supplier_profile.business_name|default:invoice.order.supplier.email }}</td></tr>
+      <tr><td class="font-semibold py-1">KYC Verified?</td><td class="py-1">{% if invoice.order.supplier.kyc_status == 'verified' %}<span class="text-green-600">Yes</span>{% else %}<span class="text-red-700">No</span>{% endif %}</td></tr>
+      <tr><td class="font-semibold py-1">Supplier Wallet Verified?</td><td class="py-1">{% if supplier_profile.stellar_wallet_verified %}<span class="text-green-600">Yes</span>{% else %}<span class="text-red-600">No</span>{% endif %}</td></tr>
+      <tr><td class="font-semibold py-1">Order Amount</td><td class="py-1">{{ order.amount }} {{ order.currency }}</td></tr>
+      <tr><td class="font-semibold py-1">Invoice Amount</td><td class="py-1">{{ invoice.amount }} {{ invoice.currency }}</td></tr>
+      <tr><td class="font-semibold py-1">Invoice Payment Address</td><td class="py-1">{{ invoice.payment_address }}
+        <span class="ml-2 text-sm">{% if fraud_analysis.payment_wallet_mismatch %}<span class="bg-red-100 text-red-700 font-semibold px-2 py-1 rounded">Mismatch with verified wallet</span>{% else %}<span class="bg-green-100 text-green-700 px-2 py-1 rounded">Matches verified wallet</span>{% endif %}</span>
+      </td></tr>
+      <tr><td class="font-semibold py-1">Previously Verified Wallet</td><td class="py-1">{{ supplier_profile.stellar_wallet_address|default:'-' }}</td></tr>
+      <tr><td class="font-semibold py-1">Duplicate Invoice Number?</td><td class="py-1">{% if fraud_analysis.duplicate_invoice_number %}<span class="bg-red-100 text-red-700 px-2 py-1 rounded font-semibold">Yes</span>{% else %}-{% endif %}</td></tr>
+    </table>
+  </div>
+  <div class="mb-8">
+    <h2 class="text-lg font-bold mb-2 text-blue-900">Deterministic Checks</h2>
+    <ul class="list-disc ml-6 text-sm">
+      <li>Supplier Name Match: {% if fraud_analysis.supplier_name_mismatch %}<span class="text-red-700 font-semibold">Mismatch</span>{% else %}<span class="text-green-700">OK</span>{% endif %}</li>
+      <li>Business Name Match: {% if fraud_analysis.business_name_mismatch %}<span class="text-red-700 font-semibold">Mismatch</span>{% else %}<span class="text-green-700">OK</span>{% endif %}</li>
+      <li>Amount Consistency: {% if fraud_analysis.amount_mismatch %}<span class="text-red-700 font-semibold">Mismatch</span>{% else %}<span class="text-green-700">OK</span>{% endif %}</li>
+      <li>Duplicate Invoice Number: {% if fraud_analysis.duplicate_invoice_number %}<span class="text-red-700 font-semibold">Duplicate</span>{% else %}<span class="text-green-700">No duplicate</span>{% endif %}</li>
+      <li>Payment Address Match: {% if fraud_analysis.payment_wallet_mismatch %}<span class="text-red-700 font-semibold">Mismatch</span>{% else %}<span class="text-green-700">OK</span>{% endif %}</li>
+      <li>KYC Verified: {% if fraud_analysis.kyc_not_verified %}<span class="text-red-700 font-semibold">Not verified</span>{% else %}<span class="text-green-700">Verified</span>{% endif %}</li>
+      <li>Wallet Verified: {% if fraud_analysis.wallet_not_verified %}<span class="text-red-700 font-semibold">Not verified</span>{% else %}<span class="text-green-700">Verified</span>{% endif %}</li>
+    </ul>
+  </div>
+  <div class="mb-8">
+    <h2 class="text-lg font-bold mb-2 text-blue-900">OpenAI Risk Analysis <span class="ml-4 text-xs px-3 py-1 rounded {{ risk_level_badge(fraud_analysis.openai_risk_level) }}">{{ fraud_analysis.openai_risk_level|capfirst|default:'N/A' }}</span></h2>
+    {% if fraud_analysis.openai_error %}
+      <div class="text-red-600 font-medium mb-2">AI analysis unavailable: {{ fraud_analysis.openai_error }}</div>
+    {% endif %}
+    {% if fraud_analysis.openai_explanation %}
+      <div class="mb-3">
+        <span class="font-semibold text-gray-800">Summary:</span>
+        <span class="text-blue-800">{{ fraud_analysis.openai_explanation }}</span>
+      </div>
+    {% endif %}
+    <table class="text-sm w-full">
+      <tr><td class="font-semibold py-1">Risk Score</td><td class="py-1">{{ fraud_analysis.openai_risk_score|default:'-' }}/100</td></tr>
+      <tr><td class="font-semibold py-1">Suspicious Findings</td><td class="py-1">{{ fraud_analysis.openai_suspicious_findings|default:'-' }}</td></tr>
+      <tr><td class="font-semibold py-1">Recommendations</td><td class="py-1">{{ fraud_analysis.openai_recommendations|default:'-' }}</td></tr>
+      <tr><td class="font-semibold py-1">AI Model</td><td class="py-1">{{ fraud_analysis.openai_model_used|default:'-' }}</td></tr>
+      <tr><td class="font-semibold py-1">Analysis Run At</td><td class="py-1">{{ fraud_analysis.analysis_at|date:'Y-m-d H:i' }}</td></tr>
+    </table>
+    <div class="mt-4 text-xs text-gray-500">
+      <span class="font-semibold">AI is never used to authorize, block, or approve settlement. Review all risk information before proceeding.</span>
+    </div>
+  </div>
+  <div class="text-center mt-8">
+    <a href="{% url 'procurement:order_detail' invoice.order.id %}" class="bg-gray-50 border border-blue-300 text-blue-700 py-2 px-6 rounded hover:bg-blue-100 font-medium transition">Back to Order Details</a>
+  </div>
+</div>
+{% endblock %}

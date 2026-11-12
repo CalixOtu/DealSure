@@ -1,0 +1,8 @@
+[package]
+name = "dealsure_escrow"
+version = "0.1.0"
+edition = "2021"
+description = "Soroban demo escrow smart contract for DealSure hackathon demo."
+
+[dependencies]
+soroban-sdk = "20.0.0"

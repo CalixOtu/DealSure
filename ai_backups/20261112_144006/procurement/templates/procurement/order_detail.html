@@ -1,0 +1,101 @@
+{% extends 'accounts/base.html' %}
+{% block title %}Order #{{ order.id }} | DealSure{% endblock %}
+{% block content %}
+<div class="bg-white shadow rounded-lg p-8 mb-8">
+  <div class="flex items-center justify-between mb-1">
+    <h1 class="font-bold text-lg text-blue-950">Procurement Order #{{ order.id }}</h1>
+    <span class="inline-block px-3 py-1 rounded text-xs font-bold bg-gray-100 border border-gray-300">{{ order.get_status_display }}</span>
+  </div>
+  <div class="mb-3 text-gray-600">Created: {{ order.created_at|date:"Y-m-d H:i" }}</div>
+  <table class="w-full text-sm mb-5">
+    <tr><td class="font-semibold py-1">Title</td><td class="py-1">{{ order.title }}</td></tr>
+    <tr><td class="font-semibold py-1">Buyer</td><td class="py-1">{{ order.buyer.business_profile.business_name|default:order.buyer.email }}</td></tr>
+    <tr><td class="font-semibold py-1">Supplier</td>
+      <td class="py-1">{{ order.supplier.business_profile.business_name|default:order.supplier.email|default:order.supplier_invite_email|default:'-' }}</td></tr>
+    <tr><td class="font-semibold py-1">Amount</td><td class="py-1">{{ order.amount }} {{ order.currency }}</td></tr>
+    <tr><td class="font-semibold py-1">Description</td><td class="py-1 whitespace-pre-line">{{ order.description }}</td></tr>
+  </table>
+  {% if supplier_decision %}
+    <div class="mb-4">
+      <span class="font-semibold">Supplier decision:</span>
+      <span class="inline px-2 ml-2 rounded font-semibold {% if supplier_decision.decision == 'accepted' %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+        {{ supplier_decision.get_decision_display }}
+      </span>
+      <span class="ml-3 text-xs text-gray-500">{{ supplier_decision.decision_at|date:"Y-m-d H:i" }}</span>
+      {% if supplier_decision.comment %}<br/><span class="text-xs text-gray-600">Comment: {{ supplier_decision.comment }}</span>{% endif %}
+    </div>
+  {% endif %}
+  <div class="space-x-4 my-3">
+    {% if request.user == order.buyer %}
+      <a href="{% url 'procurement:order_list' %}" class="text-blue-600 hover:underline">Back to orders</a>
+    {% endif %}
+    {% if request.user == order.supplier %}
+      <a href="{% url 'procurement:supplier_orders' %}" class="text-green-700 hover:underline">My Supplier Orders</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="bg-white shadow rounded-lg p-8">
+  <h2 class="font-bold text-lg text-blue-900 mb-3">Supplier Invoice</h2>
+  {% if invoice %}
+    <table class="w-full text-gray-700 text-xs mb-4">
+      <tr><td class="font-semibold py-1">Invoice Number</td><td class="py-1">{{ invoice.invoice_number }}</td></tr>
+      <tr><td class="font-semibold py-1">Amount</td><td class="py-1">{{ invoice.amount }} {{ invoice.currency }}</td></tr>
+      <tr><td class="font-semibold py-1">Description</td><td class="py-1">{{ invoice.description|default:'-' }}</td></tr>
+      <tr><td class="font-semibold py-1">Invoice Payment Address</td><td class="py-1">{{ invoice.payment_address }}</td></tr>
+      <tr><td class="font-semibold py-1">Verified Wallet (Profile)</td>
+        <td class="py-1">{{ order.supplier.business_profile.stellar_wallet_address|default:'-' }}</td></tr>
+      <tr><td class="font-semibold py-1">Payment Address Match?</td>
+        <td class="py-1">
+          {% if invoice.flag_payment_address_mismatch %}
+            <span class="text-red-600 font-bold">Mismatch</span>
+          {% else %}<span class="text-green-700 font-bold">OK</span>{% endif %}
+        </td></tr>
+      <tr><td class="font-semibold py-1">Duplicate Invoice Number?</td>
+        <td class="py-1">{% if invoice.flag_duplicate_invoice_number %}<span class="text-red-700 font-bold">Potential Duplicate</span>{% else %}-{% endif %}</td></tr>
+      <tr><td class="font-semibold py-1">Attachment</td><td class="py-1">
+        {% if invoice.attachment %}
+          <a href="{{ invoice.attachment.url }}" target="_blank" class="text-blue-600 underline">Download/View</a>
+        {% else %}-{% endif %}
+      </td></tr>
+      <tr><td class="font-semibold py-1 align-top">Fraud Risk Explanation</td><td class="py-1 whitespace-pre-line">{{ invoice.openai_risk_explanation|default:'-' }}</td></tr>
+    </table>
+  {% else %}
+    <div class="text-gray-400 my-2">No invoice submitted yet.</div>
+    {% if request.user == order.supplier and not invoice and order.status == 'supplier_accepted' %}
+      <a href="{% url 'procurement:supplier_invoice_submit' order.id %}" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition">Submit Invoice</a>
+    {% endif %}
+  {% endif %}
+</div>
+
+<div class="bg-white shadow rounded-lg p-8 mt-10">
+  <h2 class="font-bold text-lg text-blue-900 mb-4">Transaction Agreement Acceptance</h2>
+  <div class="mb-2">
+    <span class="font-semibold">Buyer:</span>
+    {% if order.buyer %}{{ order.buyer.business_profile.business_name|default:order.buyer.email }}{% else %}-{% endif %}
+    {% if agreement_buyer and agreement_buyer.accepted %}
+      <span class="inline-block ml-3 text-green-800 font-semibold">Accepted {{ agreement_buyer.accepted_at|date:"Y-m-d H:i" }}</span>
+    {% elif request.user == order.buyer and invoice %}
+      <form method="post" action="{% url 'procurement:agreement_accept' order.id %}" class="inline">
+        {% csrf_token %}
+        <button type="submit" class="ml-3 bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700 font-semibold">Accept Agreement</button>
+      </form>
+    {% else %}<span class="inline-block ml-3 px-2 text-gray-500">Not Accepted</span>
+    {% endif %}
+  </div>
+  <div class="mb-2">
+    <span class="font-semibold">Supplier:</span>
+    {% if order.supplier %}{{ order.supplier.business_profile.business_name|default:order.supplier.email }}{% else %}-{% endif %}
+    {% if agreement_supplier and agreement_supplier.accepted %}
+      <span class="inline-block ml-3 text-green-800 font-semibold">Accepted {{ agreement_supplier.accepted_at|date:"Y-m-d H:i" }}</span>
+    {% elif request.user == order.supplier and invoice and agreement_buyer and agreement_buyer.accepted %}
+      <form method="post" action="{% url 'procurement:agreement_accept' order.id %}" class="inline">
+        {% csrf_token %}
+        <button type="submit" class="ml-3 bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700 font-semibold">Accept Agreement</button>
+      </form>
+    {% else %}<span class="inline-block ml-3 px-2 text-gray-500">Not Accepted</span>
+    {% endif %}
+  </div>
+  <div class="mt-3 text-xs text-gray-500">Both parties must accept for the transaction to continue.</div>
+</div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends 'accounts/base.html' %}
+{% block title %}Dispute Detail #{{ dispute.id }} | DealSure{% endblock %}
+{% block content %}
+<div class="bg-white shadow rounded-lg max-w-2xl mx-auto p-8">
+  <h1 class="font-bold text-xl text-red-700 mb-3">Dispute #{{ dispute.id }}</h1>
+  <div class="mb-2">
+    <b>Escrow:</b> <a href="{% url 'escrow:transaction_detail' dispute.escrow.id %}" class="text-blue-700 hover:underline">#{{ dispute.escrow.id }}</a>
+  </div>
+  <div class="mb-2 text-sm">Raised by: <b>{{ dispute.raised_by.email }}</b> on {{ dispute.created_at|date:'Y-m-d H:i' }}</div>
+  <div class="mb-6 bg-red-50 border border-red-200 rounded p-4"><b>Reason:</b> {{ dispute.reason|linebreaksbr }}</div>
+  <div class="mb-6">
+    <h2 class="font-semibold text-lg text-blue-900 mb-2">Evidence</h2>
+    <ul class="space-y-2">
+      {% for ev in evidence %}
+      <li class="bg-gray-50 p-2 rounded border flex items-center justify-between">
+        <span>
+          <b>{{ ev.uploaded_by.email|default:'Unknown' }}</b>:
+          <a href="{{ ev.file.url }}" target="_blank" class="underline text-blue-700">Evidence File</a>
+          {% if ev.description %}<span class="text-xs">({{ ev.description }})</span>{% endif %}
+          <span class="text-xs text-gray-400 ml-2">on {{ ev.uploaded_at|date:'Y-m-d H:i' }}</span>
+        </span>
+      </li>
+      {% empty %}
+      <li class="text-gray-400">No evidence uploaded.</li>
+      {% endfor %}
+    </ul>
+    <div class="mt-4">
+      <a href="{% url 'escrow:evidence_upload' dispute.id %}" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded font-medium">Upload Evidence</a>
+    </div>
+  </div>
+  <div class="bg-gray-100 p-3 rounded mb-4">
+    <b>Resolution Status:</b>
+    {% if dispute.resolved %}
+      <span class="text-green-700 font-bold">Resolved</span><br>
+      <span class="text-sm">Decision by {{ dispute.resolved_by.email|default:'Admin' }} on {{ dispute.resolved_at|date:'Y-m-d H:i' }}:<br>{{ dispute.resolution|linebreaksbr }}</span>
+    {% else %}
+      <span class="text-red-700 font-bold">Not yet resolved</span><br>
+    {% endif %}
+    {% if request.user.is_staff and not dispute.resolved %}
+      <a href="{% url 'escrow:dispute_resolve' dispute.id %}" class="inline-block bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded mt-2 font-semibold">Resolve Dispute (Admin)</a>
+    {% endif %}
+  </div>
+  <div class="mt-5 text-xs text-gray-400">
+    All disputes are reviewed manually in this demonstration environment.
+  </div>
+</div>
+{% endblock %}

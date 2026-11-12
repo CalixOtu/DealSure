@@ -1,0 +1,37 @@
+{% extends 'accounts/base.html' %}
+{% block title %}Escrow Transactions | DealSure{% endblock %}
+{% block content %}
+<div class="mb-5 flex items-center justify-between">
+  <h1 class="font-bold text-xl text-blue-900">Escrow Transactions</h1>
+</div>
+<div class="bg-white shadow rounded p-4 overflow-x-auto">
+  <table class="min-w-full text-sm">
+    <thead><tr class="text-gray-700 bg-gray-100">
+      <th class="p-2">ID</th>
+      <th class="p-2">Order</th>
+      <th class="p-2">Parties</th>
+      <th class="p-2">Amount</th>
+      <th class="p-2">Status</th>
+      <th class="p-2">Dispute</th>
+      <th class="p-2"></th>
+    </tr></thead>
+    <tbody>
+      {% for trx in transactions %}
+      <tr class="border-b hover:bg-gray-50">
+        <td class="p-2 font-mono">{{ trx.id }}</td>
+        <td class="p-2">
+          <a href="{% url 'procurement:order_detail' trx.order.id %}" class="text-blue-600 hover:underline">#{{ trx.order.id }}</a>
+        </td>
+        <td class="p-2">Buyer: {{ trx.buyer.email|truncatechars:22 }}<br>Supplier: {{ trx.supplier.email|truncatechars:22 }}</td>
+        <td class="p-2">{{ trx.amount }} {{ trx.currency }}</td>
+        <td class="p-2">{{ trx.get_status_display }}</td>
+        <td class="p-2">{% if trx.is_disputed or trx.status == 'disputed' %}<span class="text-red-700 font-bold">Disputed</span>{% else %}-{% endif %}</td>
+        <td class="p-2 text-right"><a href="{% url 'escrow:transaction_detail' trx.id %}" class="text-blue-700 hover:underline">View</a></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7" class="text-center py-5 text-gray-400">No escrow records.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

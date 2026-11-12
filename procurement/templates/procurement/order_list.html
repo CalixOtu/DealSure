@@ -1,0 +1,34 @@
+{% extends 'accounts/base.html' %}
+{% block title %}My Procurement Orders | DealSure{% endblock %}
+{% block content %}
+<div class="mb-5 flex items-center justify-between">
+  <h1 class="font-bold text-xl text-blue-900">My Procurement Orders</h1>
+  <a href="{% url 'procurement:order_create' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-semibold">+ New Order</a>
+</div>
+<div class="bg-white shadow rounded p-4">
+  <table class="min-w-full text-sm">
+    <thead><tr class="text-gray-700 bg-gray-100">
+      <th class="p-2">#</th>
+      <th class="p-2">Title</th>
+      <th class="p-2">Supplier</th>
+      <th class="p-2">Amount</th>
+      <th class="p-2">Status</th>
+      <th class="p-2"></th>
+    </tr></thead>
+    <tbody>
+      {% for order in orders %}
+      <tr class="border-b hover:bg-gray-50">
+        <td class="p-2">{{ order.id }}</td>
+        <td class="p-2">{{ order.title }}</td>
+        <td class="p-2">{{ order.supplier.business_profile.business_name|default:order.supplier.email|default:order.supplier_invite_email|default:'-' }}</td>
+        <td class="p-2">{{ order.amount }} {{ order.currency }}</td>
+        <td class="p-2">{{ order.get_status_display }}</td>
+        <td class="p-2 text-right"><a href="{% url 'procurement:order_detail' order.id %}" class="text-blue-600 hover:underline">View</a></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" class="text-center py-5 text-gray-400">No orders found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

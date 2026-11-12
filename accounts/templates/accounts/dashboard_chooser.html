@@ -1,0 +1,11 @@
+{% extends 'accounts/base.html' %}
+{% block title %}Choose Role | DealSure{% endblock %}
+{% block content %}
+<div class="bg-white shadow-md rounded-lg max-w-lg mx-auto p-8 mt-8 text-center">
+  <h1 class="font-bold text-2xl text-blue-700 mb-4">Choose Your Dashboard</h1>
+  <div class="flex flex-col md:flex-row gap-6 mt-6 justify-center">
+    <a href="{% url 'accounts:buyer_dashboard' %}" class="flex-1 border border-blue-400 hover:bg-blue-50 rounded-lg py-4 px-6 font-semibold text-blue-700 hover:shadow transition">Buyer Dashboard</a>
+    <a href="{% url 'accounts:supplier_dashboard' %}" class="flex-1 border border-green-400 hover:bg-green-50 rounded-lg py-4 px-6 font-semibold text-green-700 hover:shadow transition">Supplier Dashboard</a>
+  </div>
+</div>
+{% endblock %}
