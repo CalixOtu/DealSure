@@ -1,3 +1,5 @@
+import json
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -5,6 +7,9 @@ from django.contrib import messages
 from django.urls import reverse
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.http import JsonResponse
+from django.utils import timezone
+from django.views.decorators.http import require_POST
 from .forms import RegistrationForm, UserLoginForm, UserProfileForm, BusinessProfileForm
 from .models import BusinessProfile
 
@@ -114,7 +119,10 @@ def business_profile_view(request):
     except BusinessProfile.DoesNotExist:
         messages.error(request, "Business profile not found.")
         return redirect('accounts:dashboard')
-    return render(request, "accounts/business_profile.html", {"business_profile": business_profile})
+    return render(request, "accounts/business_profile.html", {
+        "business_profile": business_profile,
+        "stellar_network": settings.STELLAR_NETWORK,
+    })
 
 
 @login_required
@@ -125,9 +133,17 @@ def business_profile_edit(request):
         # Should not happen, autocreated at registration
         business_profile = BusinessProfile.objects.create(user=request.user, business_name="", business_type="other")
     if request.method == "POST":
+        previous_wallet = business_profile.stellar_wallet_address
         form = BusinessProfileForm(request.POST, instance=business_profile)
         if form.is_valid():
-            form.save()
+            business_profile = form.save()
+            if business_profile.stellar_wallet_address != previous_wallet:
+                business_profile.stellar_wallet_verified = False
+                business_profile.wallet_verified_at = None
+                business_profile.save(update_fields=[
+                    'stellar_wallet_verified',
+                    'wallet_verified_at',
+                ])
             messages.success(request, "Business profile updated.")
             return redirect('accounts:business_profile')
         else:
@@ -135,3 +151,53 @@ def business_profile_edit(request):
     else:
         form = BusinessProfileForm(instance=business_profile)
     return render(request, "accounts/business_profile_edit.html", {"form": form, "business_profile": business_profile})
+
+
+@login_required
+@require_POST
+def stellar_wallet_challenge(request):
+    from escrow.stellar import create_wallet_challenge
+
+    return JsonResponse({
+        'message': create_wallet_challenge(request),
+        'network': settings.STELLAR_NETWORK,
+        'network_passphrase': settings.STELLAR_NETWORK_PASSPHRASE,
+    })
+
+
+@login_required
+@require_POST
+def stellar_wallet_verify(request):
+    from escrow.stellar import verify_wallet_challenge
+
+    try:
+        payload = json.loads(request.body or b'{}')
+        address = verify_wallet_challenge(
+            request,
+            payload.get('address'),
+            payload.get('signature'),
+        )
+    except (json.JSONDecodeError, ValueError) as exc:
+        return JsonResponse({'error': str(exc)}, status=400)
+
+    profile, _ = BusinessProfile.objects.get_or_create(
+        user=request.user,
+        defaults={
+            'business_name': request.user.get_full_name() or request.user.email,
+            'business_type': BusinessProfile.BusinessType.OTHER,
+        },
+    )
+    profile.stellar_wallet_address = address
+    profile.stellar_wallet_verified = True
+    profile.wallet_verified_at = timezone.now()
+    profile.save(update_fields=[
+        'stellar_wallet_address',
+        'stellar_wallet_verified',
+        'wallet_verified_at',
+        'updated_at',
+    ])
+    return JsonResponse({
+        'ok': True,
+        'address': address,
+        'network': settings.STELLAR_NETWORK,
+    })

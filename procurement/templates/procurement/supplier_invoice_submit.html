@@ -16,6 +16,7 @@
     {% endfor %}
     <button type="submit" class="mt-4 w-full bg-green-700 text-white py-2 rounded hover:bg-green-800 font-semibold">Submit Invoice</button>
     <div class="text-right mt-3 text-xs">
+      <a href="{% url 'procurement:order_detail' order.id %}" class="text-blue-600 hover:underline mr-3">View order details</a>
       <a href="{% url 'procurement:supplier_orders' %}" class="text-green-700 hover:underline">Back to supplier orders</a>
     </div>
   </form>

@@ -87,3 +87,15 @@ class BusinessProfileForm(forms.ModelForm):
             'description': forms.Textarea(attrs={"rows": 3}),
             'address': forms.Textarea(attrs={"rows": 2}),
         }
+
+    def clean_stellar_wallet_address(self):
+        address = (self.cleaned_data.get('stellar_wallet_address') or '').strip()
+        if address:
+            from escrow.stellar import is_valid_stellar_address
+
+            if not is_valid_stellar_address(address):
+                raise ValidationError(
+                    'Enter a valid Stellar G-address or connect Freighter from '
+                    'the business profile page.'
+                )
+        return address

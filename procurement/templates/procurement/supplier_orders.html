@@ -2,7 +2,13 @@
 {% block title %}Supplier Orders | DealSure{% endblock %}
 {% block content %}
 <div class="mb-5 flex items-center justify-between">
-  <h1 class="font-bold text-xl text-green-900">My Supplier Orders</h1>
+  <div>
+    <h1 class="font-bold text-xl text-green-900">My Supplier Orders</h1>
+    <div class="mt-1 text-sm space-x-3">
+      <a href="{% url 'accounts:supplier_dashboard' %}" class="text-green-700 hover:underline">Supplier Dashboard</a>
+      <a href="{% url 'escrow:transaction_list' %}" class="text-purple-700 hover:underline">Escrow Transactions</a>
+    </div>
+  </div>
 </div>
 <div class="bg-white shadow rounded p-4">
   <table class="min-w-full text-sm">
@@ -24,6 +30,9 @@
         <td class="p-2">{{ order.get_status_display }}</td>
         <td class="p-2 text-right">
           <a href="{% url 'procurement:order_detail' order.id %}" class="text-green-700 hover:underline">View</a>
+          {% if order.escrow_transaction %}
+            <a href="{% url 'escrow:transaction_detail' order.escrow_transaction.id %}" class="ml-2 text-purple-700 hover:underline">Escrow</a>
+          {% endif %}
           {% if not order.invoice and order.status == 'supplier_accepted' %}
             <a href="{% url 'procurement:supplier_invoice_submit' order.id %}" class="ml-2 text-blue-700 hover:underline">Submit Invoice</a>
           {% endif %}

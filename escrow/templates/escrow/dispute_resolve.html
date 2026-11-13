@@ -12,8 +12,8 @@
     <div>
       <label class="block font-medium text-gray-700 mb-1">Outcome</label>
       <input type="checkbox" name="allow_release" id="allow_release">
-        <label for="allow_release" class="text-gray-700">Funds may be released to supplier</label><br>
-      <span class="text-xs text-gray-400">If not checked, escrow will be refunded to buyer.</span>
+        <label for="allow_release" class="text-gray-700">Release funds to supplier now</label><br>
+      <span class="text-xs text-gray-400">If not checked, DealSure will submit an immediate Stellar refund to the buyer.</span>
     </div>
     <button type="submit" class="mt-4 w-full bg-green-700 text-white py-2 rounded hover:bg-green-800 font-semibold">Resolve Dispute</button>
     <div class="text-right mt-3 text-xs">
@@ -21,7 +21,7 @@
     </div>
   </form>
   <div class="mt-5 text-xs text-gray-400">
-    This action is administrator-only. Resolution will update the escrow and notify participants (in a complete system).
+    This action is administrator-only and submits the selected settlement to Stellar immediately.
   </div>
 </div>
 {% endblock %}

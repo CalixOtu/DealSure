@@ -13,6 +13,7 @@ from accounts.models import BusinessProfile
 from django.core.exceptions import PermissionDenied
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+from django.views.decorators.http import require_POST
 User = get_user_model()
 
 # --- Buyer Views ---
@@ -53,12 +54,34 @@ def order_detail(request, order_id):
     agreement_buyer = ProcurementOrderAgreement.objects.filter(order=order, party=order.buyer, role='buyer').first()
     agreement_supplier = ProcurementOrderAgreement.objects.filter(order=order, party=order.supplier, role='supplier').first()
     supplier_decision = SupplierOrderDecision.objects.filter(order=order).first()
+    escrow_transaction = getattr(order, 'escrow_transaction', None)
+    buyer_profile = getattr(order.buyer, 'business_profile', None)
+    supplier_profile = getattr(order.supplier, 'business_profile', None) if order.supplier else None
+    from escrow.stellar import stellar_is_configured
+
+    can_start_escrow = bool(
+        invoice
+        and agreement_buyer
+        and agreement_buyer.accepted
+        and agreement_supplier
+        and agreement_supplier.accepted
+        and not escrow_transaction
+    )
     return render(request, 'procurement/order_detail.html', {
         'order': order,
         'invoice': invoice,
         'agreement_buyer': agreement_buyer,
         'agreement_supplier': agreement_supplier,
         'supplier_decision': supplier_decision,
+        'escrow_transaction': escrow_transaction,
+        'can_start_escrow': can_start_escrow,
+        'buyer_wallet_ready': bool(
+            buyer_profile and buyer_profile.stellar_wallet_verified
+        ),
+        'supplier_wallet_ready': bool(
+            supplier_profile and supplier_profile.stellar_wallet_verified
+        ),
+        'stellar_configured': stellar_is_configured(),
     })
 
 # --- Supplier Views ---
@@ -105,8 +128,21 @@ def supplier_invoice_submit(request, order_id):
         messages.info(request, 'Invoice already submitted for this order.')
         return redirect('procurement:order_detail', order_id=order.id)
 
+    supplier_profile = getattr(request.user, 'business_profile', None)
+    if not supplier_profile or not supplier_profile.stellar_wallet_verified:
+        messages.error(
+            request,
+            'Connect and verify your Freighter wallet before submitting an invoice.',
+        )
+        return redirect('accounts:business_profile')
+
     if request.method == 'POST':
-        form = SupplierInvoiceForm(request.POST, request.FILES, supplier=request.user)
+        form = SupplierInvoiceForm(
+            request.POST,
+            request.FILES,
+            supplier=request.user,
+            order=order,
+        )
         if form.is_valid():
             invoice = form.save(commit=False)
             invoice.order = order
@@ -158,15 +194,31 @@ def supplier_invoice_submit(request, order_id):
             invoice.openai_risk_explanation = ai_explanation
             invoice.save()
             messages.success(request, 'Invoice submitted. Fraud risk will be checked.')
+            try:
+                from escrow.stellar import (
+                    StellarConfigurationError,
+                    create_escrow_for_order,
+                )
+
+                escrow, created = create_escrow_for_order(order, actor=request.user)
+                if created:
+                    messages.success(
+                        request,
+                        f'Stellar escrow #{escrow.id} was created automatically.',
+                    )
+            except StellarConfigurationError:
+                # Agreements or host escrow configuration may not be ready yet.
+                pass
             return redirect('procurement:order_detail', order_id=order.id)
         else:
             messages.error(request, 'Please fix the errors below.')
     else:
-        form = SupplierInvoiceForm(supplier=request.user)
+        form = SupplierInvoiceForm(supplier=request.user, order=order)
     return render(request, 'procurement/supplier_invoice_submit.html', {'form': form, 'order': order})
 
 # --- Agreement Acceptance ---
 @login_required
+@require_POST
 def agreement_accept(request, order_id):
     order = get_object_or_404(ProcurementOrder, id=order_id)
     if not (request.user == order.buyer or request.user == order.supplier):
@@ -182,4 +234,59 @@ def agreement_accept(request, order_id):
         messages.success(request, 'You have accepted the transaction agreement.')
     else:
         messages.info(request, 'Agreement already accepted.')
+    buyer_accepted = ProcurementOrderAgreement.objects.filter(
+        order=order,
+        role='buyer',
+        accepted=True,
+    ).exists()
+    supplier_accepted = ProcurementOrderAgreement.objects.filter(
+        order=order,
+        role='supplier',
+        accepted=True,
+    ).exists()
+    if buyer_accepted and supplier_accepted and hasattr(order, 'invoice'):
+        try:
+            from escrow.stellar import (
+                StellarConfigurationError,
+                create_escrow_for_order,
+            )
+
+            escrow, escrow_created = create_escrow_for_order(
+                order,
+                actor=request.user,
+            )
+            if escrow_created:
+                messages.success(
+                    request,
+                    f'Stellar escrow #{escrow.id} is ready for buyer funding.',
+                )
+        except StellarConfigurationError as exc:
+            messages.warning(request, f'Agreement saved. Escrow is not ready: {exc}')
+    return redirect('procurement:order_detail', order_id=order.id)
+
+
+@login_required
+@require_POST
+def escrow_start(request, order_id):
+    order = get_object_or_404(ProcurementOrder, id=order_id)
+    if not (
+        request.user == order.buyer
+        or request.user == order.supplier
+        or request.user.is_staff
+    ):
+        raise PermissionDenied
+    try:
+        from escrow.stellar import (
+            StellarConfigurationError,
+            create_escrow_for_order,
+        )
+
+        escrow, created = create_escrow_for_order(order, actor=request.user)
+    except StellarConfigurationError as exc:
+        messages.error(request, f'Unable to create Stellar escrow: {exc}')
+    else:
+        if created:
+            messages.success(request, f'Stellar escrow #{escrow.id} created.')
+        else:
+            messages.info(request, f'Stellar escrow #{escrow.id} already exists.')
     return redirect('procurement:order_detail', order_id=order.id)

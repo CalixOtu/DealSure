@@ -43,5 +43,10 @@
   <div class="mt-5 text-xs text-gray-400">
     All disputes are reviewed manually in this demonstration environment.
   </div>
+  <div class="mt-5 flex flex-wrap gap-3 text-sm">
+    <a href="{% url 'escrow:transaction_detail' dispute.escrow.id %}" class="text-blue-700 hover:underline">Back to Escrow #{{ dispute.escrow.id }}</a>
+    <a href="{% url 'escrow:transaction_list' %}" class="text-purple-700 hover:underline">All Escrow Transactions</a>
+    <a href="{% url 'procurement:order_detail' dispute.escrow.order.id %}" class="text-green-700 hover:underline">View Order #{{ dispute.escrow.order.id }}</a>
+  </div>
 </div>
 {% endblock %}

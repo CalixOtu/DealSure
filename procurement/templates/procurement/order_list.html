@@ -2,7 +2,13 @@
 {% block title %}My Procurement Orders | DealSure{% endblock %}
 {% block content %}
 <div class="mb-5 flex items-center justify-between">
-  <h1 class="font-bold text-xl text-blue-900">My Procurement Orders</h1>
+  <div>
+    <h1 class="font-bold text-xl text-blue-900">My Procurement Orders</h1>
+    <div class="mt-1 text-sm space-x-3">
+      <a href="{% url 'accounts:buyer_dashboard' %}" class="text-blue-600 hover:underline">Buyer Dashboard</a>
+      <a href="{% url 'escrow:transaction_list' %}" class="text-purple-700 hover:underline">Escrow Transactions</a>
+    </div>
+  </div>
   <a href="{% url 'procurement:order_create' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-semibold">+ New Order</a>
 </div>
 <div class="bg-white shadow rounded p-4">
@@ -23,7 +29,12 @@
         <td class="p-2">{{ order.supplier.business_profile.business_name|default:order.supplier.email|default:order.supplier_invite_email|default:'-' }}</td>
         <td class="p-2">{{ order.amount }} {{ order.currency }}</td>
         <td class="p-2">{{ order.get_status_display }}</td>
-        <td class="p-2 text-right"><a href="{% url 'procurement:order_detail' order.id %}" class="text-blue-600 hover:underline">View</a></td>
+        <td class="p-2 text-right">
+          <a href="{% url 'procurement:order_detail' order.id %}" class="text-blue-600 hover:underline">View</a>
+          {% if order.escrow_transaction %}
+            <a href="{% url 'escrow:transaction_detail' order.escrow_transaction.id %}" class="ml-2 text-purple-700 hover:underline">Escrow</a>
+          {% endif %}
+        </td>
       </tr>
       {% empty %}
       <tr><td colspan="6" class="text-center py-5 text-gray-400">No orders found.</td></tr>

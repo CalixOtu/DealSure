@@ -6,7 +6,16 @@ app_name = 'escrow'
 urlpatterns = [
     path('transactions/', views.transaction_list, name='transaction_list'),
     path('transactions/<int:escrow_id>/', views.transaction_detail, name='transaction_detail'),
-    path('transactions/<int:escrow_id>/fund/', views.transaction_fund, name='transaction_fund'),
+    path(
+        'transactions/<int:escrow_id>/fund/prepare/',
+        views.transaction_fund_prepare,
+        name='transaction_fund_prepare',
+    ),
+    path(
+        'transactions/<int:escrow_id>/fund/submit/',
+        views.transaction_fund_submit,
+        name='transaction_fund_submit',
+    ),
     path('transactions/<int:escrow_id>/confirm_delivery/', views.confirm_delivery, name='confirm_delivery'),
     path('transactions/<int:escrow_id>/confirm_receipt/', views.confirm_receipt, name='confirm_receipt'),
     path('transactions/<int:escrow_id>/release/', views.escrow_release, name='escrow_release'),

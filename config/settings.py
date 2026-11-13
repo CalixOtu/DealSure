@@ -27,12 +27,22 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = '[REDACTED]'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', '[REDACTED]')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', '1').lower() in {'1', 'true', 'yes', 'on'}
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+    if host.strip()
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',')
+    if origin.strip()
+]
 
 
 # Application definition
@@ -49,6 +59,7 @@ INSTALLED_APPS = [
     'accounts',
     'procurement',
     'ai_engine',
+    'escrow',
 
     # Third-party apps
     'django_filters',
@@ -56,8 +67,6 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
 
@@ -162,3 +171,36 @@ AUTH_USER_MODEL = 'accounts.User'
 # OpenAI
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-3.5-turbo')
+
+# Stellar classic escrow. Testnet is the safe default for demonstrations.
+STELLAR_NETWORK = os.environ.get('STELLAR_NETWORK', 'TESTNET').upper()
+STELLAR_NETWORK_PASSPHRASE = os.environ.get(
+    'STELLAR_NETWORK_PASSPHRASE',
+    (
+        'Public Global Stellar Network ; September 2015'
+        if STELLAR_NETWORK == 'PUBLIC'
+        else 'Test SDF Network ; September 2015'
+    ),
+)
+STELLAR_HORIZON_URL = os.environ.get(
+    'STELLAR_HORIZON_URL',
+    (
+        'https://horizon.stellar.org'
+        if STELLAR_NETWORK == 'PUBLIC'
+        else 'https://horizon-testnet.stellar.org'
+    ),
+)
+STELLAR_ESCROW_SECRET_KEY = os.environ.get('STELLAR_ESCROW_SECRET_KEY', '')
+STELLAR_ESCROW_PUBLIC_KEY = os.environ.get('STELLAR_ESCROW_PUBLIC_KEY', '')
+STELLAR_BASE_FEE = int(os.environ.get('STELLAR_BASE_FEE', '100'))
+STELLAR_TRANSACTION_TIMEOUT = int(
+    os.environ.get('STELLAR_TRANSACTION_TIMEOUT', '300')
+)
+STELLAR_EXPLORER_BASE_URL = os.environ.get(
+    'STELLAR_EXPLORER_BASE_URL',
+    (
+        'https://stellar.expert/explorer/public/tx'
+        if STELLAR_NETWORK == 'PUBLIC'
+        else 'https://stellar.expert/explorer/testnet/tx'
+    ),
+)

@@ -2,7 +2,18 @@
 {% block title %}Escrow Transactions | DealSure{% endblock %}
 {% block content %}
 <div class="mb-5 flex items-center justify-between">
-  <h1 class="font-bold text-xl text-blue-900">Escrow Transactions</h1>
+  <div>
+    <h1 class="font-bold text-xl text-blue-900">Escrow Transactions</h1>
+    <div class="mt-1 text-sm space-x-3">
+      <a href="{% url 'accounts:dashboard' %}" class="text-blue-600 hover:underline">Dashboard</a>
+      {% if request.user.role == 'buyer' or request.user.role == 'both' %}
+        <a href="{% url 'procurement:order_list' %}" class="text-blue-600 hover:underline">Buyer Orders</a>
+      {% endif %}
+      {% if request.user.role == 'supplier' or request.user.role == 'both' %}
+        <a href="{% url 'procurement:supplier_orders' %}" class="text-green-700 hover:underline">Supplier Orders</a>
+      {% endif %}
+    </div>
+  </div>
 </div>
 <div class="bg-white shadow rounded p-4 overflow-x-auto">
   <table class="min-w-full text-sm">
@@ -29,7 +40,7 @@
         <td class="p-2 text-right"><a href="{% url 'escrow:transaction_detail' trx.id %}" class="text-blue-700 hover:underline">View</a></td>
       </tr>
       {% empty %}
-      <tr><td colspan="7" class="text-center py-5 text-gray-400">No escrow records.</td></tr>
+      <tr><td colspan="7" class="text-center py-5 text-gray-400">No escrow records yet. Open an order from the links above to continue the transaction workflow.</td></tr>
       {% endfor %}
     </tbody>
   </table>

@@ -36,5 +36,6 @@ def fraud_analysis_view(request, invoice_id):
         'order': order,
         'fraud_analysis': fraud_analysis,
         'supplier_profile': supplier_profile,
-        'risk_level_badge': risk_level_badge,
+        'escrow_transaction': getattr(order, 'escrow_transaction', None),
+        'risk_badge_class': risk_level_badge(fraud_analysis.openai_risk_level),
     })

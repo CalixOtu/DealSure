@@ -31,7 +31,7 @@
     </ul>
   </div>
   <div class="mb-8">
-    <h2 class="text-lg font-bold mb-2 text-blue-900">OpenAI Risk Analysis <span class="ml-4 text-xs px-3 py-1 rounded {{ risk_level_badge(fraud_analysis.openai_risk_level) }}">{{ fraud_analysis.openai_risk_level|capfirst|default:'N/A' }}</span></h2>
+    <h2 class="text-lg font-bold mb-2 text-blue-900">OpenAI Risk Analysis <span class="ml-4 text-xs px-3 py-1 rounded {{ risk_badge_class }}">{{ fraud_analysis.openai_risk_level|capfirst|default:'N/A' }}</span></h2>
     {% if fraud_analysis.openai_error %}
       <div class="text-red-600 font-medium mb-2">AI analysis unavailable: {{ fraud_analysis.openai_error }}</div>
     {% endif %}
@@ -54,6 +54,9 @@
   </div>
   <div class="text-center mt-8">
     <a href="{% url 'procurement:order_detail' invoice.order.id %}" class="bg-gray-50 border border-blue-300 text-blue-700 py-2 px-6 rounded hover:bg-blue-100 font-medium transition">Back to Order Details</a>
+    {% if escrow_transaction %}
+      <a href="{% url 'escrow:transaction_detail' escrow_transaction.id %}" class="ml-3 bg-purple-50 border border-purple-300 text-purple-700 py-2 px-6 rounded hover:bg-purple-100 font-medium transition">View Escrow</a>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

@@ -1,9 +1,16 @@
 {% extends 'accounts/base.html' %}
+{% load static %}
 {% block title %}Escrow #{{ escrow.id }} | DealSure{% endblock %}
 {% block content %}
 <div class="bg-white shadow-lg rounded-lg p-8 max-w-3xl mx-auto">
+  <div class="mb-5 rounded border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-900">
+    <span class="font-bold">Stellar {{ escrow.network }}</span> — funding and settlement are submitted to Stellar using real wallet signatures and test XLM.
+  </div>
   <h1 class="font-bold text-xl text-blue-900 mb-2">Escrow Transaction #{{ escrow.id }}</h1>
-  <div class="text-sm mb-4">Order: <a href="{% url 'procurement:order_detail' escrow.order.id %}" class="text-blue-700 hover:underline">#{{ escrow.order.id }}</a></div>
+  <div class="text-sm mb-4 space-x-3">
+    <span>Order: <a href="{% url 'procurement:order_detail' escrow.order.id %}" class="text-blue-700 hover:underline">#{{ escrow.order.id }}</a></span>
+    <a href="{% url 'escrow:transaction_list' %}" class="text-purple-700 hover:underline">Back to Escrow Transactions</a>
+  </div>
   <div class="mb-3 grid grid-cols-2 gap-4">
     <div>
       <span class="font-semibold text-gray-700">Buyer:</span> <span class="text-blue-900">{{ escrow.buyer.email }}</span>
@@ -17,18 +24,37 @@
     <div>
       <span class="font-semibold text-gray-700">Status:</span> <span class="font-bold">{{ escrow.get_status_display }}</span>
     </div>
+    <div>
+      <span class="font-semibold text-gray-700">Held Balance:</span> {{ escrow.demo_balance }} {{ escrow.currency }}
+    </div>
+    <div>
+      <span class="font-semibold text-gray-700">Network:</span> {{ escrow.network }}
+    </div>
     <div class="col-span-2">
       <span class="font-semibold text-gray-700">Created:</span> {{ escrow.created_at|date:'Y-m-d H:i' }} &nbsp; <span class='font-semibold'>Updated:</span> {{ escrow.updated_at|date:'Y-m-d H:i' }}
     </div>
+  </div>
+  <div class="mb-6 rounded border bg-gray-50 p-4 text-xs">
+    <div class="mb-2"><span class="font-semibold">Escrow wallet:</span> <span class="font-mono break-all">{{ escrow.escrow_wallet_address }}</span></div>
+    <div class="mb-2"><span class="font-semibold">Buyer wallet:</span> <span class="font-mono break-all">{{ escrow.buyer_wallet_address }}</span></div>
+    <div><span class="font-semibold">Supplier wallet:</span> <span class="font-mono break-all">{{ escrow.supplier_wallet_address }}</span></div>
   </div>
   <div class="my-6">
     <h2 class="font-bold text-blue-800 mb-2">Actions</h2>
     <div class="flex flex-wrap gap-3">
       {% if request.user == escrow.buyer and escrow.status == 'pending' %}
-        <form method="post" action="{% url 'escrow:transaction_fund' escrow.id %}">
-          {% csrf_token %}
-          <button class="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold">Fund Escrow (Testnet Demo)</button>
-        </form>
+        {% if stellar_configured %}
+          <button
+            type="button"
+            data-stellar-fund
+            data-prepare-url="{% url 'escrow:transaction_fund_prepare' escrow.id %}"
+            data-submit-url="{% url 'escrow:transaction_fund_submit' escrow.id %}"
+            data-status-target="stellar-funding-status"
+            class="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold"
+          >Fund {{ escrow.amount }} {{ escrow.currency }} with Freighter</button>
+        {% else %}
+          <div class="rounded bg-red-50 border border-red-200 px-4 py-2 text-red-700">The hosted Stellar escrow account is not configured yet.</div>
+        {% endif %}
       {% endif %}
       {% if request.user == escrow.supplier and escrow.status == 'funded' %}
         <form method="post" action="{% url 'escrow:confirm_delivery' escrow.id %}">
@@ -36,27 +62,49 @@
           <button class="bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded font-semibold">Confirm Delivery</button>
         </form>
       {% endif %}
-      {% if request.user == escrow.buyer and escrow.supplier_confirmed_delivery and escrow.status == 'awaiting_delivery' %}
+      {% if request.user == escrow.buyer and escrow.supplier_confirmed_delivery and escrow.status == 'delivery_confirmed' %}
         <form method="post" action="{% url 'escrow:confirm_receipt' escrow.id %}">
           {% csrf_token %}
           <button class="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold">Confirm Receipt</button>
         </form>
       {% endif %}
-      {% if (request.user == escrow.buyer or request.user.is_staff) and escrow.status == 'receipt_confirmed' and not escrow.is_disputed %}
+      {% if can_release %}
         <form method="post" action="{% url 'escrow:escrow_release' escrow.id %}">
           {% csrf_token %}
           <button class="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded font-semibold">Release Funds to Supplier</button>
         </form>
       {% endif %}
-      {% if (request.user == escrow.supplier or request.user.is_staff) and escrow.status in 'funded awaiting_delivery'.split() and not escrow.is_disputed %}
+      {% if can_refund %}
         <form method="post" action="{% url 'escrow:escrow_refund' escrow.id %}">
           {% csrf_token %}
           <button class="bg-red-700 hover:bg-red-800 text-white px-4 py-2 rounded font-semibold">Refund to Buyer</button>
         </form>
       {% endif %}
-      {% if not escrow.is_disputed and escrow.status != 'released' and escrow.status != 'refunded' %}
+      {% if can_dispute %}
         <a href="{% url 'escrow:dispute_create' escrow.id %}" class="bg-red-100 hover:bg-red-200 text-red-800 font-bold px-4 py-2 rounded">Raise Dispute</a>
       {% endif %}
+    </div>
+    <div id="stellar-funding-status" class="mt-3 text-sm text-blue-800"></div>
+  </div>
+  <div class="my-8">
+    <h2 class="font-bold text-blue-900 mb-2">Stellar Payments</h2>
+    <div class="overflow-x-auto border rounded">
+      <table class="text-xs w-full">
+        <thead class="bg-gray-100"><tr><th class="p-2">Type</th><th class="p-2">Amount</th><th class="p-2">From / To</th><th class="p-2">Transaction</th><th class="p-2">Status</th></tr></thead>
+        <tbody>
+        {% for payment in payments %}
+          <tr class="border-t">
+            <td class="p-2 font-semibold">{{ payment.get_payment_type_display }}</td>
+            <td class="p-2">{{ payment.amount }} {{ payment.asset }}</td>
+            <td class="p-2 font-mono"><span title="{{ payment.source_address }}">{{ payment.source_address|slice:':8' }}…</span> → <span title="{{ payment.destination_address }}">{{ payment.destination_address|slice:':8' }}…</span></td>
+            <td class="p-2 font-mono"><a href="{{ stellar_explorer_base_url }}/{{ payment.transaction_hash }}" target="_blank" rel="noopener" class="text-blue-700 hover:underline" title="{{ payment.transaction_hash }}">{{ payment.transaction_hash|slice:':12' }}…</a></td>
+            <td class="p-2 text-green-700">{{ payment.get_status_display }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5" class="p-4 text-center text-gray-400">No Stellar payment has been submitted yet.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
   <div class="my-8">
@@ -94,7 +142,11 @@
     </div>
   </div>
   <div class="mt-8 text-center text-xs text-gray-400">
-    All operations here are demonstration-only and do not interact with mainnet assets. Actual Stellar smart contract escrow is not implemented in the current demo.
+    This demonstration uses real Stellar testnet transactions and test XLM. The hosted account is a custodial pooled escrow and must not be used for production or mainnet funds without a security review.
   </div>
 </div>
+{% endblock %}
+{% block extra_body %}
+  <script src="https://cdn.jsdelivr.net/npm/@stellar/freighter-api@6.0.1/build/index.min.js"></script>
+  <script src="{% static 'js/stellar_wallet.js' %}"></script>
 {% endblock %}

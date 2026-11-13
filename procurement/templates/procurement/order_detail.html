@@ -32,6 +32,11 @@
     {% if request.user == order.supplier %}
       <a href="{% url 'procurement:supplier_orders' %}" class="text-green-700 hover:underline">My Supplier Orders</a>
     {% endif %}
+    {% if escrow_transaction %}
+      <a href="{% url 'escrow:transaction_detail' escrow_transaction.id %}" class="text-purple-700 hover:underline">View Escrow Transaction</a>
+    {% else %}
+      <a href="{% url 'escrow:transaction_list' %}" class="text-purple-700 hover:underline">My Escrow Transactions</a>
+    {% endif %}
   </div>
 </div>
 
@@ -101,5 +106,38 @@
     {% endif %}
   </div>
   <div class="mt-3 text-xs text-gray-500">Both parties must accept for the transaction to continue.</div>
+</div>
+
+<div class="bg-white shadow rounded-lg p-8 mt-10">
+  <h2 class="font-bold text-lg text-purple-900 mb-4">Stellar Escrow</h2>
+  <div class="grid sm:grid-cols-3 gap-3 text-sm mb-5">
+    <div class="rounded border p-3">
+      <div class="font-semibold">Buyer wallet</div>
+      {% if buyer_wallet_ready %}<span class="text-green-700">Verified</span>{% else %}<span class="text-red-700">Not connected</span>{% endif %}
+    </div>
+    <div class="rounded border p-3">
+      <div class="font-semibold">Supplier wallet</div>
+      {% if supplier_wallet_ready %}<span class="text-green-700">Verified</span>{% else %}<span class="text-red-700">Not connected</span>{% endif %}
+    </div>
+    <div class="rounded border p-3">
+      <div class="font-semibold">Hosted escrow</div>
+      {% if stellar_configured %}<span class="text-green-700">Configured</span>{% else %}<span class="text-red-700">Server setup required</span>{% endif %}
+    </div>
+  </div>
+  {% if escrow_transaction %}
+    <a href="{% url 'escrow:transaction_detail' escrow_transaction.id %}" class="inline-block bg-purple-700 hover:bg-purple-800 text-white px-5 py-2 rounded font-semibold">Open Stellar Escrow #{{ escrow_transaction.id }}</a>
+  {% elif can_start_escrow %}
+    {% if request.user == order.buyer or request.user == order.supplier or request.user.is_staff %}
+      <form method="post" action="{% url 'procurement:escrow_start' order.id %}">
+        {% csrf_token %}
+        <button type="submit" class="bg-purple-700 hover:bg-purple-800 text-white px-5 py-2 rounded font-semibold">Create Stellar Escrow</button>
+      </form>
+    {% endif %}
+  {% else %}
+    <p class="text-sm text-gray-600">A matching XLM invoice, both agreement acceptances, two verified wallets, and the hosted escrow account are required.</p>
+  {% endif %}
+  {% if not buyer_wallet_ready or not supplier_wallet_ready %}
+    <a href="{% url 'accounts:business_profile' %}" class="inline-block mt-3 text-purple-700 hover:underline">Connect my Freighter wallet</a>
+  {% endif %}
 </div>
 {% endblock %}

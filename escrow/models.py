@@ -3,9 +3,9 @@ from django.core.validators import MinValueValidator
 from decimal import Decimal
 from django.conf import settings
 from procurement.models import ProcurementOrder, SupplierInvoice
-from django.utils import timezone
 
 User = settings.AUTH_USER_MODEL
+
 
 class EscrowTransaction(models.Model):
     class EscrowStatus(models.TextChoices):
@@ -24,7 +24,12 @@ class EscrowTransaction(models.Model):
     supplier = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='escrow_supplier')
     amount = models.DecimalField(max_digits=16, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
     currency = models.CharField(max_length=10, default='XLM')
+    network = models.CharField(max_length=32, default='TESTNET')
+    escrow_wallet_address = models.CharField(max_length=56, blank=True)
+    buyer_wallet_address = models.CharField(max_length=56, blank=True)
+    supplier_wallet_address = models.CharField(max_length=56, blank=True)
     status = models.CharField(max_length=24, choices=EscrowStatus.choices, default=EscrowStatus.PENDING)
+    status_before_dispute = models.CharField(max_length=24, blank=True)
     buyer_funded_at = models.DateTimeField(null=True, blank=True)
     supplier_confirmed_delivery = models.BooleanField(default=False)
     supplier_confirmed_at = models.DateTimeField(null=True, blank=True)
@@ -43,6 +48,21 @@ class EscrowTransaction(models.Model):
     def __str__(self):
         return f"Escrow #{self.pk} Order {self.order_id} Status: {self.get_status_display()}"
 
+    @property
+    def demo_balance(self):
+        balance = Decimal('0')
+        for payment in self.payments.filter(
+            status=StellarPayment.PaymentStatus.CONFIRMED
+        ):
+            if payment.payment_type == StellarPayment.PaymentType.FUND:
+                balance += payment.amount
+            elif payment.payment_type in {
+                StellarPayment.PaymentType.RELEASE,
+                StellarPayment.PaymentType.REFUND,
+            }:
+                balance -= payment.amount
+        return max(balance, Decimal('0'))
+
 
 class EscrowAudit(models.Model):
     escrow = models.ForeignKey(EscrowTransaction, on_delete=models.CASCADE, related_name='audits')
@@ -53,6 +73,50 @@ class EscrowAudit(models.Model):
 
     def __str__(self):
         return f"Audit: {self.action} at {self.created_at}" 
+
+
+class StellarPayment(models.Model):
+    class PaymentType(models.TextChoices):
+        FUND = 'fund', 'Buyer Funding'
+        RELEASE = 'release', 'Supplier Release'
+        REFUND = 'refund', 'Buyer Refund'
+
+    class PaymentStatus(models.TextChoices):
+        CONFIRMED = 'confirmed', 'Confirmed'
+        FAILED = 'failed', 'Failed'
+
+    escrow = models.ForeignKey(
+        EscrowTransaction,
+        on_delete=models.CASCADE,
+        related_name='payments',
+    )
+    transaction_hash = models.CharField(max_length=64, unique=True)
+    payment_type = models.CharField(max_length=16, choices=PaymentType.choices)
+    source_address = models.CharField(max_length=56)
+    destination_address = models.CharField(max_length=56)
+    amount = models.DecimalField(max_digits=16, decimal_places=2)
+    asset = models.CharField(max_length=10, default='XLM')
+    network = models.CharField(max_length=32, default='TESTNET')
+    memo = models.CharField(max_length=64, blank=True)
+    status = models.CharField(
+        max_length=16,
+        choices=PaymentStatus.choices,
+        default=PaymentStatus.CONFIRMED,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['escrow', 'payment_type'],
+                name='unique_stellar_payment_type_per_escrow',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.get_payment_type_display()} {self.amount} {self.asset}"
+
 
 class Dispute(models.Model):
     escrow = models.ForeignKey(EscrowTransaction, on_delete=models.CASCADE, related_name='disputes')
